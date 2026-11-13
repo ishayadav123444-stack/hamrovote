@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="ne">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>नेपाल पूर्ण ७७ जिल्ला जनमत सर्वेक्षण तथा उम्मेदवार मञ्च</title>
+
+  <!-- Tailwind CSS & Lucide Icons -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Supabase client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- React & Babel for Browser Rendering -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Mukta:wght@300;400;600;700;800&display=swap');
+    body { font-family: 'Mukta', sans-serif; }
+
+    @keyframes stampBounce {
+      0% { transform: scale(3) rotate(-20deg); opacity: 0; }
+      50% { transform: scale(1.1) rotate(5deg); opacity: 0.9; }
+      100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
+    .animate-stamp {
+      animation: stampBounce 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-pink-50 via-white to-pink-100 min-h-screen text-slate-800">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // Supabase project details: replace these two placeholders after creating your project.
+    const SUPABASE_URL = 'https://ectymskvhgjpuledzkxi.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_pM2GwaI9Don6wrU6wxd1hw_n6jMjZpC';
+    const supabaseConfigured = SUPABASE_URL.startsWith('https://') &&
+      !SUPABASE_URL.includes('YOUR_SUPABASE') &&
+      SUPABASE_ANON_KEY && !SUPABASE_ANON_KEY.includes('YOUR_SUPABASE');
+    const supabase = supabaseConfigured
+      ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+      : null;
+
+    const DEFAULT_CANDIDATES = [
+      { id: 'rsp', name: 'राष्ट्रिय स्वतन्त्र पार्टी (रास्वपा)', party: 'रास्वपा', symbol: '🔔', isCustom: false },
+      { id: 'nc', name: 'नेपाली कांग्रेस', party: 'नेपाली कांग्रेस', symbol: '🌳', isCustom: false },
+      { id: 'uml', name: 'नेकपा (एमाले)', party: 'नेकपा एमाले', symbol: '☀️', isCustom: false },
+      { id: 'mc', name: 'नेकपा (माओवादी केन्द्र)', party: 'माओवादी केन्द्र', symbol: '☭', isCustom: false },
+      { id: 'rpp', name: 'राष्ट्रिय प्रजातन्त्र पार्टी (राप्रपा)', party: 'राप्रपा', symbol: '🐮', isCustom: false },
+      { id: 'janamat', name: 'जनमत पार्टी', party: 'जनमत पार्टी', symbol: '📢', isCustom: false },
+      { id: 'naugap', name: 'नागरिक उन्मुक्ति पार्टी', party: 'नाउपा', symbol: '🌾', isCustom: false },
+      { id: 'ind', name: 'स्वतन्त्र उम्मेदवार समूह', party: 'स्वतन्त्र', symbol: '🗳️', isCustom: false }
+    ];
+
+    // नेपालका सम्पूर्ण ७७ जिल्ला र तिनका पालिका डेटा
+    const NEPAL_DATA = {
+      "कोशी प्रदेश": {
+        "ताप्लेजुङ": ["फुङलिङ न.पा.", "सिरिजङ्घा गा.पा.", "आठराई त्रिवेणी गा.पा.", "पाथीभरा याङवरक गा.पा.", "मेरिङदेन गा.पा.", "मिक्वाखोला गा.पा.", "फक्ताङलुङ गा.पा.", "सिदिङ्वा गा.पा.", "मैवाखोला गा.पा."],
+        "पाँचथर": ["फिदिम न.पा.", "फालेलुङ गा.पा.", "फाल्गुनन्द गा.पा.", "हिलिहाङ गा.पा.", "कुम्मायक गा.पा.", "मिक्लाजुङ गा.पा.", "तुमवेवा गा.पा.", "याङवरक गा.पा."],
+        "इलाम": ["इलाम न.पा.", "सूर्योदय न.पा.", "माई न.पा.", "देउमाई न.पा.", "फाकफोकथुम गा.पा.", "माईजोगमाई गा.पा.", "चुलाचुली गा.पा.", "रोङ गा.पा.", "माङ्सेबुङ गा.पा.", "सन्दकपुर गा.पा."],
+        "झापा": ["मेचीनगर न.पा.", "बिर्तामोड न.पा.", "दमक न.पा.", "कन्काई न.पा.", "भद्रपुर न.पा.", "अर्जुनधारा न.पा.", "शिवसताक्षी न.पा.", "गौरादह न.पा.", "कमल गा.पा.", "बुद्धशान्ति गा.पा.", "कचनकवल गा.पा.", "झापा गा.पा.", "बाह्रदशी गा.पा.", "गौरीगञ्ज गा.पा.", "हल्दीबारी गा.पा."],
+        "मोरङ": ["विराटनगर म.न.पा.", "सुन्दरहरैँचा न.पा.", "बेलबारी न.पा.", "पथरी शनिश्चरे न.पा.", "उर्लाबारी न.पा.", "लेटाङ न.पा.", "रङ्गेली न.पा.", "रतुवामाई न.पा.", "सुनवर्षि न.पा.", "कटहरी गा.पा.", "ग्रामथान गा.पा.", "धनपालथान गा.पा.", "मिक्लाजुङ गा.पा.", "बुढीगङ्गा गा.पा.", "कानेपोखरी गा.पा.", "जहदा गा.पा.", "केराबारी गा.पा."],
+        "सुनसरी": ["धरान उप.म.न.पा.", "इटहरी उप.म.न.पा.", "इनरुवा न.पा.", "बराहक्षेत्र न.पा.", "रामधुनी न.पा.", "दुहबी न.पा.", "गढी गा.पा.", "कोशी गा.पा.", "बर्जु गा.पा.", "भोक्राहा नरसिंह गा.पा.", "हरिनगर गा.पा.", "देवानगञ्ज गा.पा."],
+        "धनकुटा": ["धनकुटा न.पा.", "पाख्रिबास न.पा.", "महालक्ष्मी न.पा.", "साँगुरीगढी गा.पा.", "साहीदभूमि गा.पा.", "छथर जोरपाटी गा.पा.", "चौबीसे गा.पा."],
+        "तेह्रथुम": ["म्याङलुङ न.पा.", "लालीगुराँस न.पा.", "आठराई गा.पा.", "छथर गा.पा.", "फेदाप गा.पा.", "मेन्छयायेम गा.पा."],
+        "सङ्खुवासभा": ["खाँदबारी न.पा.", "चैनपुर न.पा.", "धर्मदेवी न.पा.", "पाँचखपन न.पा.", "मादी न.पा.", "भोटखोला गा.पा.", "मकालु गा.पा.", "सभापोखरी गा.पा.", "सिलिचोङ गा.पा.", "चिचिला गा.पा."],
+        "भोजपुर": ["भोजपुर न.पा.", "षडानन्द न.पा.", "ट्याम्केमयुङ गा.पा.", "अरुण गा.पा.", "पौवादुङ्मा गा.पा.", "साल्पासिलिछो गा.पा.", "रामप्रसादराई गा.पा.", "हतुवागढी गा.पा.", "आमचोक गा.पा."],
+        "सोलुखुम्बु": ["सोलुदुधकुण्ड न.पा.", "माप्य दुधकोशी गा.पा.", "खुम्बू पासाङल्हामू गा.पा.", "नेचासल्यान गा.पा.", "महाकुलुङ गा.पा.", "लिखु पिके गा.पा.", "थुलुङ दुधकोशी गा.पा.", "सोताङ गा.पा."],
+        "ओखलढुङ्गा": ["सिद्धिचरण न.पा.", "खिजिदेम्बा गा.पा.", "चम्पादेवी गा.पा.", "चिशङ्खुगढी गा.पा.", "मानेभञ्ज्याङ गा.पा.", "मोलुङ गा.पा.", "लिखु गा.पा.", "सुनकोशी गा.पा."],
+        "खोटाङ": ["दिक्तेल रुपाकोट मझुवागढी न.पा.", "हलेसी तुवाचुङ न.पा.", "ऐसेलुखर्क गा.पा.", "रावा बेसी गा.पा.", "केपिलासगढी गा.पा.", "खोटेहाङ गा.पा.", "जन्तेढुङ्गा गा.पा.", "दिप्रुङ चुइचुम्मा गा.पा.", "साकेला गा.पा.", "बराहपोखरी गा.पा."],
+        "उदयपुर": ["त्रियुगा न.पा.", "कटारी न.पा.", "चौदण्डीगढी न.पा.", "बेलका न.पा.", "उदयपुरगढी गा.पा.", "ताप्ली गा.पा.", "रौतामाई गा.पा.", "सुनकोशी गा.पा."]
+      },
+      "मधेश प्रदेश": {
+        "सप्तरी": ["राजविराज न.पा.", "कञ्चनरुप न.पा.", "डाकनेश्वरी न.पा.", "बोदेबर्साइन न.पा.", "शम्भुनाथ न.पा.", "सुरुङ्गा न.पा.", "हनुमाननगर कङ्कालिनी न.पा.", "खडक न.पा.", "अग्निसाइर कृष्णासवरन गा.पा.", "छिन्नमस्ता गा.पा.", "महादेवा गा.पा.", "सप्तकोशी गा.पा.", "तिलोठी गा.पा.", "बलान-विहुल गा.पा.", "विष्णुपुर गा.पा."],
+        "सिराहा": ["सिराहा न.पा.", "लाहान न.पा.", "गोलबजार न.पा.", "मिर्चैया न.पा.", "कल्याणपुर न.पा.", "सुखीपुर न.पा.", "धनगढीमाई न.पा.", "कर्जन्हा न.पा.", "भगवानपुर गा.पा.", "औरही गा.पा.", "विष्णुपुर गा.पा.", "बारियारपट्टी गा.पा.", "लक्ष्मीपुर पतारी गा.पा.", "नरहा गा.पा.", "सखुवानान्कारकट्टी गा.पा.", "अर्नमा गा.पा.", "नवराजपुर गा.पा."],
+        "धनुषा": ["जनकपुरधाम उप.म.न.पा.", "क्षीरेश्वरनाथ न.पा.", "गणेशमान चारनाथ न.पा.", "धनुषाधाम न.पा.", "मिथिला न.पा.", "नगराइन न.पा.", "विदेह न.पा.", "सबैला न.पा.", "कमला न.पा.", "मिथिला विहारी न.पा.", "हंसपुर न.पा.", "बाहुDirect न.पा.", "मुखियापट्टी मुसहरमिया गा.पा.", "लक्ष्मीनिया गा.पा.", "धनौजी गा.पा.", "ओरही गा.पा."],
+        "महोत्तरी": ["जलेश्वर न.पा.", "बर्दिबास न.पा.", "गौशाला न.पा.", "रामगोपालपुर न.पा.", "मनरा शिसवा न.पा.", "मटिहानी न.पा.", "भङ्गाहा न.पा.", "बलवा न.पा.", "लोहारपट्टी न.पा.", "औराही न.पा.", "एकडारा गा.पा.", "सोन्मा गा.पा.", "साम्सी गा.पा.", "पिपरा गा.पा.", "महोत्तरी गा.पा."],
+        "सर्लाही": ["मलङ्गवा न.पा.", "हरिपुर न.पा.", "लालबन्दी न.पा.", "ईश्वरपुर न.पा.", "बरहथवा न.पा.", "बागमती न.पा.", "हरिपूर्वा न.पा.", "हरिऔन न.पा.", "गोडैटा न.पा.", "कविलसी न.पा.", "बलरा न.पा.", "चक्रघट्टा गा.पा.", "चन्द्रनगर गा.पा.", "धन्कौल गा.पा.", "ब्रह्मपुरी गा.पा.", "रामनगर गा.पा.", "विष्णु गा.पा.", "कौडेना गा.पा.", "पर्सा गा.पा.", "बसबरिया गा.पा."],
+        "रौतहट": ["गौर न.पा.", "चन्द्रपुर न.पा.", "गरुडा न.पा.", "राजपुर न.पा.", "बौधीमाई न.पा.", "वृन्दावन न.पा.", "देवाही गोनाही न.पा.", "मौलापुर न.पा.", "माधवनारायण न.पा.", "गुजरा न.पा.", "ईशनाथ न.पा.", "परोहा न.पा.", "फतुवा विजयपुर न.पा.", "गढीमाई न.पा.", "दुर्गा भगवती गा.पा.", "यमुनामाई गा.पा."],
+        "बारा": ["कलैया उप.म.न.पा.", "जीतपुरसिमरा उप.म.न.पा.", "कोल्हवी न.पा.", "निजगढ न.पा.", "महागढीमाई न.पा.", "सिमरौनगढ न.पा.", "पचरौता न.पा.", "देवताल गा.पा.", "प्रसाउनी गा.पा.", "सुवर्ण गा.पा.", "बारागढी गा.पा.", "करैयामाई गा.पा.", "परवानीपुर गा.पा.", "विश्रामपुर गा.पा.", "अदर्शकोतवाल गा.पा."],
+        "पर्सा": ["वीरगञ्ज म.न.पा.", "पोखरिया न.पा.", "बहुदरमाई न.पा.", "पर्सागढी न.पा.", "ठोरी गा.पा.", "जगन्नाथपुर गा.पा.", "धोबिनी गा.पा.", "छिपहरमाई गा.पा.", "पकाहा मैनपुर गा.पा.", "बिन्दवासिनी गा.पा.", "सखुवा प्रसौनी गा.पा.", "पटेर्वा सुगौली गा.पा.", "कालिकामाई गा.पा.", "जिराभवानी गा.पा."]
+      },
+      "बागमती प्रदेश": {
+        "सिन्धुली": ["कमलामाई न.पा.", "दूधौली न.पा.", "गोलञ्जोर गा.पा.", "घ्याङलेख गा.पा.", "तीनपाटन गा.पा.", "फिककल गा.पा.", "मरिण गा.पा.", "सुनकोशी गा.पा.", "हरिहरपुरगढी गा.पा."],
+        "रामेछाप": ["मन्थली न.पा.", "रामेछाप न.पा.", "उमाकुण्ड गा.पा.", "खाँडादेवी गा.पा.", "गोकुलगङ्गा गा.पा.", "दोरम्बा गा.पा.", "लिखु तामाकोशी गा.पा.", "सुनापति गा.पा."],
+        "दोलखा": ["भीमेश्वर न.पा.", "जिरी न.पा.", "कालिञ्चोक गा.पा.", "गौरीशङ्कर गा.पा.", "तामाकोशी गा.पा.", "मेलुङ गा.पा.", "विगु गा.पा.", "वैतेश्वर गा.पा.", "शैलुङ गा.पा."],
+        "सिन्धुपाल्चोक": ["चौतारा साँगाचोकगढी न.पा.", "बाह्रबीसे न.पा.", "मेलम्ची न.पा.", "इन्द्रावती गा.पा.", "जुगल गा.पा.", "पाँचपोखरी थाङपाल गा.पा.", "बलेफी गा.पा.", "भोटेकोशी गा.पा.", "त्रिपुरासुन्दरी गा.पा.", "लिसङ्खु पाखर गा.पा.", "सुनकोशी गा.पा.", "हेलम्बु गा.पा."],
+        "काभ्रेपलाञ्चोक": ["धुलिखेल न.पा.", "बनेपा न.पा.", "पनौती न.पा.", "पाँचखाल न.पा.", "नमोबुद्ध न.पा.", "मण्डनदेउपुर न.पा.", "खानीखोला गा.पा.", "चौंरीदेउराली गा.पा.", "तेमाल गा.पा.", "बेथानचोक गा.पा.", "भुम्लु गा.पा.", "महाभार गा.पा.", "रोशी गा.पा."],
+        "ललितपुर": ["ललितपुर महानगरपालिका", "गोदावरी नगरपालिका", "महालक्ष्मी नगरपालिका", "कोनेज्योसोम गाउँपालिका", "बागमती गाउँपालिका", "महाङ्काल गाउँपालिका"],
+        "भक्तपुर": ["भक्तपुर नगरपालिका", "मध्यपुर थिमी नगरपालिका", "सूर्यविनायक नगरपालिका", "चाँगुनारायण नगरपालिका"],
+        "काठमाडौँ": ["काठमाडौँ महानगरपालिका", "कीर्तिपुर नगरपालिका", "गोकर्णेश्वर नगरपालिका", "चन्द्रागिरि नगरपालिका", "टोखा नगरपालिका", "तारकेश्वर नगरपालिका", "नागार्जुन नगरपालिका", "बूढानीलकण्ठ नगरपालिका", "कागेश्वरी मनोहरा नगरपालिका", "शङ्खरापुर नगरपालिका", "दक्षिणकाली नगरपालिका"],
+        "नुवाकोट": ["विदुर न.पा.", "बेलकोटगढी न.पा.", "ककनी गा.पा.", "किस्पाङ गा.पा.", "तादी गा.पा.", "तारकेश्वर गा.पा.", "दुुप्चेश्वर गा.पा.", "पञ्चकन्या गा.पा.", "लिखु गा.पा.", "शिवपुरी गा.पा.", "सूर्यगढी गा.पा.", "म्यागङ गा.पा."],
+        "रसुवा": ["उत्तरगया गा.पा.", "कालिका गा.पा.", "गोसाइँकुण्ड गा.पा.", "नौकुण्ड गा.पा.", "आमाछोदिङ्मो गा.पा."],
+        "धादिङ": ["नीलकण्ठ न.पा.", "धुनीबेँसी न.पा.", "खनियाबास गा.पा.", "गङ्गाजमुना गा.पा.", "गज्जुरी गा.पा.", "गलछी गा.पा.", "ज्वालामुखी गा.पा.", "थाक्रे गा.पा.", "त्रिपेणी गा.पा.", "नेत्रावती डबजोङ गा.पा.", "बेनीघाट रोराङ गा.पा.", "रूवी भ्याली गा.पा.", "सिद्धलेक गा.पा."],
+        "मकवानपुर": ["हेटौँडा उप.म.न.पा.", "थाहा न.पा.", "इन्द्रसरोवर गा.पा.", "कैलाश गा.पा.", "बकाैया गा.पा.", "बागमती गा.पा.", "भीमफेदी गा.पा.", "मनहरी गा.पा.", "राक्सिराङ्ग गा.पा.", "मकवानपुरगढी गा.पा."],
+        "चितवन": ["भरतपुर महानगरपालिका", "रत्ननगर नगरपालिका", "खैरहनी नगरपालिका", "माडी नगरपालिका", "राप्ती नगरपालिका", "कालिका नगरपालिका", "इच्छाकामना गाउँपालिका"]
+      },
+      "गण्डकी प्रदेश": {
+        "गोरखा": ["गोरखा न.पा.", "पालुङटार न.पा.", "शहीद लखन गा.पा.", "बारपाक सुलीकोट गा.पा.", "आरूघाट गा.पा.", "अजिरकोट गा.पा.", "चुमनुव्री गा.पा.", "धार्चे गा.पा.", "भिमसेनथापा गा.पा.", "गण्डकी गा.पा.", "सिरानचोक गा.पा."],
+        "मनाङ": ["चामे गा.पा.", "नार्पा भूमि गा.पा.", "नासोङ गा.पा.", "मनाङ ङिस्याङ गा.पा."],
+        "मुस्ताङ": ["घरपझोङ गा.पा.", "थासाङ गा.पा.", "लो-घेकर दामोदरकुण्ड गा.पा.", "लोमान्थाङ गा.पा.", "वारागुङ मुक्तिक्षेत्र गा.पा."],
+        "म्याग्दी": ["बेनी न.पा.", "अन्नपूर्ण गा.पा.", "धवलागिरी गा.पा.", "मङ्गला गा.पा.", "मालिका गा.पा.", "रघुगङ्गा गा.पा."],
+        "कास्की": ["पोखरा महानगरपालिका", "अन्नपूर्ण गाउँपालिका", "माछापुच्छ्रे गाउँपालिका", "मादी गाउँपालिका", "रूपा गाउँपालिका"],
+        "लमजुङ": ["बेसीशहर नगरपालिका", "सुन्दरबजार नगरपालिका", "राइनस नगरपालिका", "मध्यनेपाल नगरपालिका", "मर्स्याङ्दी गाउँपालिका", "दोर्दी गाउँपालिका", "क्व्होलासोथार गाउँपालिका", "दूधपोखरी गाउँपालिका"],
+        "तनहुँ": ["व्यास न.पा.", "शुक्लागण्डकी न.पा.", "भानु न.पा.", "भिमाद न.पा.", "आँबुखैरेनी गा.पा.", "ऋषिङ गा.पा.", "घिरिङ गा.पा.", "देवघाट गा.पा.", "म्यानदे गा.पा.", "बन्दीपुर गा.पा."],
+        "नवलपुर (बर्दघाट सुस्ता पूर्व)": ["कावासोती न.पा.", "देवचुली न.पा.", "गैँडाकोट न.पा.", "मध्यविन्दु न.पा.", "बुलिङटार गा.पा.", "बौदीकाली गा.पा.", "विनयी त्रिवेणी गा.पा.", "हुप्सेकोट गा.पा."],
+        "स्याङ्जा": ["पुतलीबजार न.पा.", "वालिङ न.पा.", "गल्याङ न.पा.", "चापाकोट न.पा.", "आँधीखोला गा.पा.", "अर्जुनचौपारी गा.पा.", "कालीगण्डकी गा.पा.", "फेदीखोला गा.पा.", "बिरुवा गा.पा.", "भुम्लीगाड गा.पा.", "हरिनास गा.पा."],
+        "पर्वत": ["कुश्मा न.पा.", "फलेवास न.पा.", "जलजला गा.पा.", "पैयूँ गा.पा.", "महाशिला गा.पा.", "मोदी गा.पा.", "विहादी गा.पा."],
+        "बाग्लुङ": ["बाग्लुङ न.पा.", "गलकोट न.पा.", "जैमिनी न.पा.", "ढोरपाटन न.पा.", "काठेखोला गा.पा.", "तमानखोला गा.पा.", "ताराखोला गा.पा.", "निसिखोला गा.पा.", "बडिगाड गा.पा.", "बरेङ गा.पा."]
+      },
+      "लुम्बिनी प्रदेश": {
+        "पूर्वी रुकुम": ["पुथा उत्तरगङ्गा गा.पा.", "भूमे गा.पा.", "सिस्वाने गा.पा."],
+        "रोल्पा": ["लिवाङ (रोल्पा) न.पा.", "त्रिवेणी गा.पा.", "परिवर्तन गा.पा.", "माडी गा.पा.", "रुन्टीगढी गा.पा.", "लुङ्ग्री गा.पा.", "गंगादेव गा.पा.", "सुनछहरी गा.पा.", "सुवर्णावती गा.पा.", "थबाङ गा.पा."],
+        "प्युठान": ["प्युठान न.पा.", "स्वर्गद्वारी न.पा.", "ऐरावती गा.पा.", "गौमुखी गा.पा.", "झिमरुक गा.पा.", "नौबहिनी गा.पा.", "माण्डवी गा.पा.", "मल्लरानी गा.पा.", "सरुमारानी गा.पा."],
+        "गुल्मी": ["रेसुङ्गा न.पा.", "मुसिकोट न.पा.", "ईश्मा गा.पा.", "कालीगण्डकी गा.पा.", "गुल्मीदरबार गा.पा.", "सत्यवती गा.पा.", "चन्द्रकोट गा.पा.", "रुरुक्षेत्र गा.पा.", "छत्रकोट गा.पा.", "धुरकोट गा.पा.", "मदाने गा.पा.", "मलिकार्चुन गा.पा."],
+        "अर्घाखाँची": ["सन्धिकर्क न.पा.", "शीतगङ्गा न.पा.", "भूमिकास्थान न.पा.", "छत्रदेव गा.पा.", "पाणिनी गा.पा.", "मालारानी गा.पा."],
+        "पालुङ/पाल्पा": ["तानसेन न.पा.", "रामपूर न.पा.", "निसदी गा.पा.", "पूर्वाखोला गा.पा.", "रम्भा गा.पा.", "माठारगढी गा.पा.", "तिनाउ गा.पा.", "बग्नासकाली गा.पा.", "रिब्डीकोट गा.पा.", "रैनादेवी छहरा गा.पा."],
+        "नवलपरासी (बर्दघाट सुस्ता पश्चिम)": ["रामग्राम न.पा.", "सुनवल न.पा.", "बर्दघाट न.पा.", "पाल्हीनन्दन गा.पा.", "प्रतापपुर गा.पा.", "सरावल गा.पा.", "सुस्ता गा.पा."],
+        "रुपन्देही": ["बुटवल उप.म.न.पा.", "सिद्धार्थनगर न.पा.", "तिलोत्तमा न.पा.", "सैनामैना न.पा.", "लुम्बिनी सांस्कृतिक न.पा.", "देवदह न.पा.", "ओमसतिया गा.पा.", "कञ्चन गा.पा.", "कोटहीमाई गा.पा.", "गैडहवा गा.पा.", "मर्चवारी गा.पा.", "मायादेवी गा.पा.", "रोहिणी गा.पा.", "सम्मेरीमाई गा.पा.", "सियारी गा.पा.", "शुद्धोधन गा.पा."],
+        "कपिलवस्तु": ["तौलिहवा न.पा.", "शिवराज न.पा.", "बुद्धभूमि न.पा.", "वाणगङ्गा न.पा.", "महाराजगञ्ज न.पा.", "कृष्णनगर न.पा.", "कम्पनी गा.पा.", "विजयनगर गा.पा.", "मायादेवी गा.पा.", "शुद्धोधन गा.पा.", "यशोधरा गा.पा."],
+        "दाङ": ["घोराही उप.म.न.पा.", "तुलसीपुर उप.म.न.पा.", "लमही न.पा.", "गढवा गा.पा.", "दङ्गीशरण गा.पा.", "राजपुर गा.पा.", "राप्ती गा.पा.", "शान्तिनगर गा.पा.", "बङ्गलाचुली गा.पा.", "बबई गा.पा."],
+        "बाँके": ["नेपालगञ्ज उप.म.न.पा.", "कोहलपुर न.पा.", "खजुरा गा.पा.", "जानकी गा.पा.", "डुडुवा गा.पा.", "नरैनापुर गा.पा.", "बैजनाथ गा.पा.", "राप्ती सोनारी गा.पा."],
+        "बर्दिया": ["गुलरिया न.पा.", "मधुवन न.पा.", "राजापुर न.पा.", "ठाकुरबाबा न.पा.", "बाँसगढी न.पा.", "बारबर्दिया न.पा.", "गेरूवा गा.पा.", "बढैयाताल गा.पा."]
+      },
+      "कर्णाली प्रदेश": {
+        "डोल्पा": ["ठूली भेरी न.पा.", "त्रिपुरासुन्दरी न.पा.", "डोल्पो बुद्ध गा.पा.", "शे फोक्सुण्डो गा.पा.", "जगदुल्ला गा.पा.", "मुड्केचुला गा.पा.", "काइके गा.पा.", "छार्का ताङसोङ गा.पा."],
+        "मुगु": ["छायाँनाथ रारा न.पा.", "मुगुम कर्मारोङ गा.पा.", "सोरु गा.पा.", "खत्याड गा.पा."],
+        "हुम्ला": ["सिमकोट गा.पा.", "नामखा गा.पा.", "खार्पुनाथ गा.पा.", "सर्केगाड गा.पा.", "चङ्खेली गा.पा.", "अदानचुली गा.पा.", "ताञ्जाकोट गा.पा."],
+        "जुम्ला": ["चन्दननाथ न.पा.", "कनकासुन्दरी गा.पा.", "सिञ्जा गा.पा.", "हिमा गा.पा.", "तिला गा.पा.", "गुठिचौर गा.पा.", "तातोपानी गा.पा.", "पातारासी गा.पा."],
+        "कालिकोट": ["खाँडाचक्र न.पा.", "रास्कुट न.पा.", "तिलागुफा न.पा.", "पचालझरना गा.पा.", "सान्नी त्रिवेणी गा.पा.", "नरहरिनाथ गा.पा.", "शुभकालिका गा.पा.", "महावै गा.पा.", "पलाता गा.पा."],
+        "दैलेख": ["नारायण न.पा.", "दुल्लु न.पा.", "चामुण्डा बिन्द्रासैनी न.पा.", "आठबीस न.पा.", "भगवतीमाई गा.पा.", "गुराँस गा.पा.", "डूङ्गेश्वर गा.पा.", "नौमुले गा.पा.", "महाबु गा.पा.", "भैरवी गा.पा.", "ठाटीकाँध गा.पा."],
+        "जाजरकोट": ["भेरी न.पा.", "छेडागाड न.पा.", "नलगाड न.पा.", "कुकुरी गा.पा.", "कुसे गा.पा.", "जुनीचाँदे गा.पा.", "शिवालय गा.पा."],
+        "पश्चिमी रुकुम": ["मुसिकोट न.पा.", "चौरजहारी न.पा.", "आठबीसकोट न.पा.", "बाँफिकोट गा.पा.", "सानोभेरी गा.पा.", "त्रिवेणी गा.पा."],
+        "सल्यान": ["शारदा न.पा.", "बागचौर न.पा.", "बनगाड कुपिण्डे न.पा.", "कालीमाटी गा.पा.", "छत्रेश्वरी गा.पा.", "ढोरचौर गा.पा.", "कुमाख गा.पा.", "सिद्धकुमाख गा.पा.", "दार्मा गा.पा.", "कपूरकोट गा.पा."],
+        "सुर्खेत": ["वीरेन्द्रनगर न.पा.", "भेरीगंगा न.पा.", "गुर्भाकोट न.पा.", "पञ्चपुरी न.पा.", "लेकवेशी न.पा.", "चौकुने गा.पा.", "चिङ्गाड गा.पा.", "सिम्ता गा.पा.", "बराहताल गा.पा."]
+      },
+      "सुदूरपश्चिम प्रदेश": {
+        "बाजुरा": ["बडीमालिका न.पा.", "त्रिवेणी न.पा.", "बुढीगङ्गा न.पा.", "बुढीनन्दा न.पा.", "गौमूल गा.पा.", "जगन्नाथ गा.पा.", "स्वामीकार्तिक खापर गा.पा.", "खप्तड छेडेदह गा.पा.", "हिमाली गा.पा."],
+        "बझाङ": ["जयपृथ्वी न.पा.", "बुङ्गल न.पा.", "काँडा गा.पा.", "केदारस्युँ गा.पा.", "खप्तडछान्ना गा.पा.", "छबिसपाथीभेरा गा.पा.", "तलकोट गा.पा.", "थलारा गा.पा.", "दुर्गाथली गा.पा.", "मष्टा गा.पा.", "वित्थडचिर गा.पा.", "साँइपाल गा.पा."],
+        "दार्चुला": ["महाकाली न.पा.", "शैल्यशिखर न.पा.", "मालिकार्जुन गा.पा.", "अपिहिमाल गा.पा.", "व्याँस गा.पा.", "नौगाड गा.पा.", "मार्मा गा.पा.", "लेकम गा.पा.", "दुहूँ गा.पा."],
+        "बैतडी": ["दशरथचन्द न.पा.", "पाटन न.पा.", "मेलौली न.पा.", "पुर्चौडी न.पा.", "सुर्नया गा.पा.", "सिगास गा.पा.", "शिवनाथ गा.पा.", "पञ्चेश्वर गा.पा.", "दोगडाकेदार गा.पा.", "डीलासैनी गा.पा."],
+        "डडेल्धुरा": ["अमरगढी न.पा.", "परशुराम न.पा.", "आलिताल गा.पा.", "भागेश्वर गा.पा.", "नवदुर्गा गा.पा.", "अजयमेरु गा.पा.", "गन्यापधुरा गा.पा."],
+        "डोटी": ["दिपायल सिलगढी न.पा.", "शिखर न.पा.", "पूर्वीचौकी गा.पा.", "बडीकेदार गा.पा.", "जोरायल गा.पा.", "सायल गा.पा.", "आदर्श गा.पा.", "केआईसिंह गा.पा.", "बोगटान फुड्सिल गा.पा."],
+        "अछाम": ["मङ्गलसेन न.पा.", "कमलबजार न.पा.", "साँफेबगर न.पा.", "पञ्चदेवल विनायक न.पा.", "चौरपाटी गा.पा.", "मेल्लेख गा.पा.", "बान्निगढी जयगढ गा.पा.", "रामरोशन गा.पा.", "ढकारी गा.पा.", "तुर्माखाँद गा.पा."],
+        "कैलाली": ["धनगढी म.न.पा.", "टीकापुर न.पा.", "गोदावरी न.पा.", "लम्कीचुहा न.पा.", "घोडाघोडी न.पा.", "भजनी न.पा.", "गौरीगङ्गा न.पा.", "जानकी गा.पा.", "बर्दगोरिया गा.पा.", "मोहन्याल गा.पा.", "कैलारी गा.पा.", "जोशीपुर गा.पा.", "चौरपाटी गा.पा."],
+        "कञ्चनपुर": ["भीमदत्त न.पा.", "पुनर्वास न.पा.", "बेलौरी न.पा.", "शुक्लाफाँटा न.पा.", "महालकाली न.पा.", "वेदकोट न.पा.", "कृष्णपुर न.पा.", "बेलडाँडी गा.पा.", "लालझाडी गा.पा."]
+      }
+    };
+
+    function App() {
+      const [candidates, setCandidates] = useState(DEFAULT_CANDIDATES);
+      const [voteResults, setVoteResults] = useState([]);
+      const [backendReady, setBackendReady] = useState(false);
+      const [backendMessage, setBackendMessage] = useState('');
+      const [refreshKey, setRefreshKey] = useState(0);
+
+      const [province, setProvince] = useState('');
+      const [district, setDistrict] = useState('');
+      const [localBody, setLocalBody] = useState('');
+      const [selectedParty, setSelectedParty] = useState('');
+      const [showStamp, setShowStamp] = useState(false);
+      const [statusMsg, setStatusMsg] = useState('');
+      const [activeTab, setActiveTab] = useState('poll');
+
+      const [candName, setCandName] = useState('');
+      const [candParty, setCandParty] = useState('');
+      const [candProvince, setCandProvince] = useState('');
+      const [candDistrict, setCandDistrict] = useState('');
+      const [candPhoto, setCandPhoto] = useState(null);
+      const [regMsg, setRegMsg] = useState('');
+
+      const [filterProvince, setFilterProvince] = useState('');
+      const [filterDistrict, setFilterDistrict] = useState('');
+      const [filterLocalBody, setFilterLocalBody] = useState('');
+
+      useEffect(() => {
+        let alive = true;
+        async function initializeBackend() {
+          if (!supabaseConfigured) {
+            setBackendMessage('Supabase जडान गर्न बाँकी छ। तलको SETUP निर्देशनअनुसार Project URL र anon key राख्नुहोस्।');
+            return;
+          }
+          try {
+            const { data: authData, error: authError } = await supabase.auth.getSession();
+            if (authError) throw authError;
+            if (!authData.session) {
+              const { error } = await supabase.auth.signInAnonymously();
+              if (error) throw error;
+            }
+            const { data, error } = await supabase.from('candidates').select('*').eq('is_active', true).order('created_at', { ascending: false });
+            if (error) throw error;
+            if (alive) {
+              setCandidates(data && data.length ? data.map(row => ({
+                id: row.id, name: row.name, party: row.party, province: row.province,
+                district: row.district, photo: row.photo_url, symbol: row.symbol || '👤',
+                isCustom: row.is_custom
+              })) : DEFAULT_CANDIDATES);
+              setBackendReady(true);
+              setBackendMessage('साझा Supabase डेटाबेससँग जडान भयो।');
+            }
+          } catch (error) {
+            if (alive) setBackendMessage('डेटाबेस जडान हुन सकेन: ' + (error.message || 'कृपया Supabase सेटअप जाँच्नुहोस्।'));
+          }
+        }
+        initializeBackend();
+        return () => { alive = false; };
+      }, []);
+
+      useEffect(() => {
+        let alive = true;
+        async function loadResults() {
+          if (!supabaseConfigured) return;
+          const { data, error } = await supabase.rpc('get_vote_results', {
+            p_province: filterProvince || null,
+            p_district: filterDistrict || null,
+            p_local_body: filterLocalBody || null
+          });
+          if (!alive) return;
+          if (error) {
+            setBackendMessage('नतिजा लोड गर्न समस्या भयो: ' + error.message);
+            return;
+          }
+          setVoteResults(data || []);
+        }
+        loadResults();
+        return () => { alive = false; };
+      }, [filterProvince, filterDistrict, filterLocalBody, refreshKey]);
+
+      const handleImageUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          if (file.size > 2 * 1024 * 1024) {
+            setRegMsg('फोटो २ MB भन्दा सानो हुनुपर्छ।');
+            e.target.value = '';
+            return;
+          }
+          const reader = new FileReader();
+          reader.onloadend = () => setCandPhoto(reader.result);
+          reader.readAsDataURL(file);
+        }
+      };
+
+      const handleRegisterCandidate = async (e) => {
+        e.preventDefault();
+        setRegMsg('');
+        if (!backendReady) {
+          setRegMsg('पहिले Supabase जडान गर्नुहोस्।');
+          return;
+        }
+        if (!candName.trim() || !candParty.trim() || !candProvince || !candDistrict) {
+          setRegMsg('कृपया नाम, पार्टी, प्रदेश र जिल्ला पूरा भर्नुहोस्।');
+          return;
+        }
+        try {
+          let photoUrl = null;
+          if (candPhoto) {
+            const response = await fetch(candPhoto);
+            const blob = await response.blob();
+            const filePath = 'candidate-' + crypto.randomUUID() + '.jpg';
+            const { error: uploadError } = await supabase.storage.from('candidate-photos').upload(filePath, blob, {
+              contentType: blob.type || 'image/jpeg', upsert: false
+            });
+            if (uploadError) throw uploadError;
+            const { data: publicData } = supabase.storage.from('candidate-photos').getPublicUrl(filePath);
+            photoUrl = publicData.publicUrl;
+          }
+          const { data, error } = await supabase.from('candidates').insert({
+            name: candName.trim(), party: candParty.trim(), province: candProvince,
+            district: candDistrict, photo_url: photoUrl, symbol: '👤', is_custom: true
+          }).select().single();
+          if (error) throw error;
+          setCandidates(prev => [{ id: data.id, name: data.name, party: data.party,
+            province: data.province, district: data.district, photo: data.photo_url,
+            symbol: data.symbol || '👤', isCustom: data.is_custom }, ...prev]);
+          setRegMsg('बधाई छ! उम्मेदवार साझा डेटाबेसमा दर्ता भयो।');
+          setCandName(''); setCandParty(''); setCandPhoto(null);
+          setCandProvince(''); setCandDistrict('');
+        } catch (error) {
+          setRegMsg('दर्ता हुन सकेन: ' + (error.message || 'कृपया फेरि प्रयास गर्नुहोस्।'));
+        }
+      };
+
+      const handleVoteSubmit = async (e) => {
+        e.preventDefault();
+        setStatusMsg('');
+        if (!backendReady) {
+          setStatusMsg('मतदान गर्नुअघि Supabase जडान हुनुपर्छ।');
+          return;
+        }
+        if (!province || !district || !localBody || !selectedParty) {
+          setStatusMsg('कृपया प्रदेश, जिल्ला, पालिका र उम्मेदवार सबै छान्नुहोस्।');
+          return;
+        }
+        setShowStamp(true);
+        try {
+          const { error } = await supabase.rpc('submit_vote', {
+            p_province: province,
+            p_district: district,
+            p_local_body: localBody,
+            p_candidate_id: selectedParty
+          });
+          if (error) throw error;
+          setStatusMsg('तपाईंको मत सफलतापूर्वक दर्ता भयो!');
+          setSelectedParty('');
+          setRefreshKey(value => value + 1);
+        } catch (error) {
+          const msg = (error.message || '').toLowerCase().includes('already voted')
+            ? 'यो ब्राउजर/सत्रबाट पहिले नै मतदान भइसकेको छ।'
+            : 'मत दर्ता हुन सकेन: ' + (error.message || 'कृपया फेरि प्रयास गर्नुहोस्।');
+          setStatusMsg(msg);
+        } finally {
+          setShowStamp(false);
+        }
+      };
+
+      const totalFilteredVotes = voteResults.reduce((sum, row) => sum + Number(row.vote_count || 0), 0);
+      const getCandidateFilteredCount = (candId) => {
+        const row = voteResults.find(item => item.candidate_id === candId);
+        return row ? Number(row.vote_count) : 0;
+      };
+
+      return (
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          <header className="text-center mb-8">
+            <div className="inline-block bg-pink-100 text-pink-700 font-bold px-4 py-1 rounded-full text-xs md:text-sm mb-2 border border-pink-200">
+              नेपाल ७७ वटै जिल्ला • स्वस्तिका छाप सहित पालिका नतिजा
+            </div>
+            <h1 className="text-3xl md:text-5xl font-extrabold text-pink-700 tracking-tight">
+              नेपाल जनमत तथा पालिका निर्वाचन पोर्टेल
+            </h1>
+            <p className="text-slate-600 mt-2 text-sm md:text-base">
+              ७७ वटै जिल्लाका पालिका अनुसार मतदान गर्नुहोस् र लाइभ नतिजा हेर्नुहोस्!
+            </p>
+          </header>
+
+          <div className={`mb-5 rounded-xl px-4 py-3 text-sm font-semibold text-center ${backendReady ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-800 border border-amber-200'}`}>
+            {backendMessage || 'Supabase जडान जाँच हुँदैछ...'}
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-2 mb-8 border-b border-pink-200 pb-3">
+            <button
+              onClick={() => setActiveTab('poll')}
+              className={`px-5 py-2.5 rounded-xl font-bold transition-all ${
+                activeTab === 'poll'
+                  ? 'bg-pink-600 text-white shadow-lg shadow-pink-200'
+                  : 'bg-white text-slate-600 hover:bg-pink-50'
+              }`}
+            >
+              🗳️ मतदान गर्नुहोस्
+            </button>
+
+            <button
+              onClick={() => setActiveTab('register')}
+              className={`px-5 py-2.5 rounded-xl font-bold transition-all ${
+                activeTab === 'register'
+                  ? 'bg-pink-600 text-white shadow-lg shadow-pink-200'
+                  : 'bg-white text-slate-600 hover:bg-pink-50'
+              }`}
+            >
+              🙋‍♂️ उम्मेदवार दर्ता
+            </button>
+
+            <button
+              onClick={() => setActiveTab('results')}
+              className={`px-5 py-2.5 rounded-xl font-bold transition-all ${
+                activeTab === 'results'
+                  ? 'bg-pink-600 text-white shadow-lg shadow-pink-200'
+                  : 'bg-white text-slate-600 hover:bg-pink-50'
+              }`}
+            >
+              📊 पालिका अनुसारको नतिजा
+            </button>
+          </div>
+
+          {activeTab === 'poll' && (
+            <div className="bg-white rounded-3xl shadow-xl p-6 md:p-10 border border-pink-100 relative overflow-hidden">
+              {statusMsg && (
+                <div className={`p-4 rounded-xl mb-6 font-semibold text-center ${
+                  statusMsg.includes('सफलतापूर्वक') 
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                    : 'bg-rose-50 text-rose-700 border border-rose-200'
+                }`}>
+                  {statusMsg}
+                </div>
+              )}
+
+              <form onSubmit={handleVoteSubmit} className="space-y-6">
+                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 text-sm text-slate-600">
+                  तपाईंको मत इमेल ठेगानासँग जोडिँदैन। दोहोर्‍याएर मतदान रोक्न Supabase anonymous session प्रयोग हुन्छ।
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-2">२. प्रदेश छान्नुहोस्</label>
+                    <select
+                      value={province}
+                      onChange={(e) => { setProvince(e.target.value); setDistrict(''); setLocalBody(''); }}
+                      className="w-full px-4 py-3 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-500 bg-pink-50/20"
+                    >
+                      <option value="">-- प्रदेश --</option>
+                      {Object.keys(NEPAL_DATA).map(p => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-2">३. जिल्ला (७७ जिल्ला)</label>
+                    <select
+                      value={district}
+                      disabled={!province}
+                      onChange={(e) => { setDistrict(e.target.value); setLocalBody(''); }}
+                      className="w-full px-4 py-3 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-500 bg-pink-50/20 disabled:bg-slate-100"
+                    >
+                      <option value="">-- जिल्ला --</option>
+                      {province && Object.keys(NEPAL_DATA[province] || {}).map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-2">४. नगरपालिका / गाउँपालिका</label>
+                    <select
+                      value={localBody}
+                      disabled={!district}
+                      onChange={(e) => setLocalBody(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-500 bg-pink-50/20 disabled:bg-slate-100"
+                    >
+                      <option value="">-- पालिका --</option>
+                      {district && (NEPAL_DATA[province]?.[district] || []).map(l => (
+                        <option key={l} value={l}>{l}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-3">५. मत हाल्न उम्मेदवार वा पार्टी छान्नुहोस्</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    {candidates.map(cand => {
+                      const isSelected = selectedParty === cand.id;
+                      return (
+                        <div
+                          key={cand.id}
+                          onClick={() => setSelectedParty(cand.id)}
+                          className={`p-4 rounded-2xl border-2 cursor-pointer relative overflow-hidden flex items-center space-x-3 transition-all ${
+                            isSelected
+                              ? 'border-pink-600 bg-pink-50 shadow-md scale-102'
+                              : 'border-slate-100 hover:border-pink-300 bg-white'
+                          }`}
+                        >
+                          {isSelected && (
+                            <div className="absolute right-2 bottom-2 text-rose-600 opacity-80 animate-stamp font-black text-2xl flex flex-col items-center">
+                              <span className="text-3xl leading-none">卐</span>
+                              <span className="text-[9px] uppercase tracking-tighter text-rose-700">स्वस्तिका छाप</span>
+                            </div>
+                          )}
+
+                          {cand.photo ? (
+                            <img src={cand.photo} alt={cand.name} className="w-12 h-12 rounded-full object-cover border-2 border-pink-400" />
+                          ) : (
+                            <div className="w-12 h-12 rounded-full bg-pink-100 flex items-center justify-center text-2xl">
+                              {cand.symbol}
+                            </div>
+                          )}
+                          <div>
+                            <div className="font-bold text-slate-800 text-sm">{cand.name}</div>
+                            <div className="text-xs text-pink-600 font-medium">पार्टी: {cand.party}</div>
+                            {cand.isCustom && (
+                              <div className="text-[10px] text-slate-400">{cand.district}, {cand.province}</div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={showStamp || !backendReady}
+                  className="w-full py-4 bg-gradient-to-r from-pink-600 to-rose-600 text-white font-extrabold text-lg rounded-xl hover:from-pink-700 hover:to-rose-700 shadow-lg shadow-pink-200 transition-all relative flex items-center justify-center space-x-2"
+                >
+                  <span>स्वस्तिका छाप लगाई मत पेश गर्नुहोस् (Submit Vote)</span>
+                  {showStamp && <span className="animate-spin text-2xl">卐</span>}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {activeTab === 'register' && (
+            <div className="bg-white rounded-3xl shadow-xl p-6 md:p-10 border border-pink-100 max-w-2xl mx-auto">
+              <h2 className="text-2xl font-bold text-slate-800 mb-2 text-center">उम्मेदवार दर्ता फारम</h2>
+              <p className="text-slate-500 text-sm text-center mb-6">आफ्नो नाम, फोटो र पार्टी राखी डिजिटल चुनावमा प्रतिस्पर्धा गर्नुहोस्</p>
+
+              {regMsg && (
+                <div className={`p-4 rounded-xl mb-6 font-semibold text-center ${
+                  regMsg.includes('बधाई') 
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                    : 'bg-rose-50 text-rose-700 border border-rose-200'
+                }`}>
+                  {regMsg}
+                </div>
+              )}
+
+              <form onSubmit={handleRegisterCandidate} className="space-y-5">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-2">१. उम्मेदवारको नाम</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="जस्तै: राम श्रेष्ठ"
+                    value={candName}
+                    onChange={(e) => setCandName(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-500 bg-pink-50/20"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-2">२. पार्टी वा समूहको नाम</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="जस्तै: स्वतन्त्र युवा अभियान"
+                    value={candParty}
+                    onChange={(e) => setCandParty(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-500 bg-pink-50/20"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-2">३. प्रदेश</label>
+                    <select
+                      value={candProvince}
+                      onChange={(e) => { setCandProvince(e.target.value); setCandDistrict(''); }}
+                      className="w-full px-4 py-3 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-500 bg-pink-50/20"
+                    >
+                      <option value="">-- प्रदेश --</option>
+                      {Object.keys(NEPAL_DATA).map(p => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-2">४. जिल्ला</label>
+                    <select
+                      value={candDistrict}
+                      disabled={!candProvince}
+                      onChange={(e) => setCandDistrict(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-500 bg-pink-50/20 disabled:bg-slate-100"
+                    >
+                      <option value="">-- जिल्ला --</option>
+                      {candProvince && Object.keys(NEPAL_DATA[candProvince] || {}).map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-2">५. फोटो (Optional Photo)</label>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleImageUpload}
+                    className="w-full px-4 py-2 border border-pink-200 rounded-xl bg-pink-50/20 text-slate-600"
+                  />
+                  {candPhoto && (
+                    <div className="mt-3 flex items-center space-x-3">
+                      <img src={candPhoto} alt="Preview" className="w-16 h-16 rounded-full object-cover border-2 border-pink-500" />
+                      <span className="text-xs text-emerald-600 font-bold">फोटो तयार भयो!</span>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={!backendReady}
+                  className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-extrabold text-lg rounded-xl hover:from-emerald-700 hover:to-teal-700 shadow-lg shadow-emerald-100 transition-all"
+                >
+                  उम्मेदवार दर्ता गर्नुहोस्
+                </button>
+              </form>
+            </div>
+          )}
+
+          {activeTab === 'results' && (
+            <div className="bg-white rounded-3xl shadow-xl p-6 md:p-10 border border-pink-100">
+              <div className="mb-6 border-b pb-6">
+                <h2 className="text-2xl font-bold text-slate-800 mb-1">नगरपालिका / गाउँपालिका नतिजा</h2>
+                <p className="text-slate-500 text-sm mb-4">स्थान अनुसार कुन उम्मेदवारले कति भोट ल्याए हेर्नुहोस्:</p>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-pink-50/50 p-4 rounded-2xl border border-pink-100">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">प्रदेश छान्नुहोस्</label>
+                    <select
+                      value={filterProvince}
+                      onChange={(e) => { setFilterProvince(e.target.value); setFilterDistrict(''); setFilterLocalBody(''); }}
+                      className="w-full px-3 py-2 rounded-xl border border-pink-200 text-sm bg-white"
+                    >
+                      <option value="">-- सबै प्रदेश (राष्ट्रिय) --</option>
+                      {Object.keys(NEPAL_DATA).map(p => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">जिल्ला छान्नुहोस्</label>
+                    <select
+                      value={filterDistrict}
+                      disabled={!filterProvince}
+                      onChange={(e) => { setFilterDistrict(e.target.value); setFilterLocalBody(''); }}
+                      className="w-full px-3 py-2 rounded-xl border border-pink-200 text-sm bg-white disabled:bg-slate-100"
+                    >
+                      <option value="">-- सबै जिल्ला --</option>
+                      {filterProvince && Object.keys(NEPAL_DATA[filterProvince] || {}).map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">नगरपालिका / गाउँपालिका छान्नुहोस्</label>
+                    <select
+                      value={filterLocalBody}
+                      disabled={!filterDistrict}
+                      onChange={(e) => setFilterLocalBody(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-pink-200 text-sm bg-white disabled:bg-slate-100"
+                    >
+                      <option value="">-- सबै पालिका --</option>
+                      {filterDistrict && (NEPAL_DATA[filterProvince]?.[filterDistrict] || []).map(l => (
+                        <option key={l} value={l}>{l}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex justify-between items-center">
+                  <span className="text-sm font-bold text-slate-600">
+                    {filterLocalBody ? `${filterLocalBody} को नतिजा` : filterDistrict ? `${filterDistrict} जिल्लाको नतिजा` : filterProvince ? `${filterProvince} को नतिजा` : 'समग्र राष्ट्रिय नतिजा'}
+                  </span>
+                  <span className="text-xs bg-pink-100 text-pink-700 font-extrabold px-3 py-1 rounded-full">
+                    कुल खसेको मत: {totalFilteredVotes}
+                  </span>
+                </div>
+              </div>
+
+              {totalFilteredVotes === 0 ? (
+                <div className="text-center py-10 text-slate-400">
+                  यो पालिका/क्षेत्रमा अहिलसम्म कुनै पनि भोट खसेको छैन।
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {candidates.map(cand => {
+                    const count = getCandidateFilteredCount(cand.id);
+                    const percent = totalFilteredVotes > 0 ? ((count / totalFilteredVotes) * 100).toFixed(1) : 0;
+                    return (
+                      <div key={cand.id} className="space-y-1.5 bg-pink-50/30 p-3.5 rounded-2xl border border-pink-100">
+                        <div className="flex justify-between items-center font-bold text-sm">
+                          <span className="flex items-center space-x-3">
+                            {cand.photo ? (
+                              <img src={cand.photo} className="w-8 h-8 rounded-full object-cover border border-pink-400" />
+                            ) : (
+                              <span className="text-xl">{cand.symbol}</span>
+                            )}
+                            <div>
+                              <span className="text-slate-800">{cand.name}</span>
+                              <span className="text-xs text-pink-600 ml-2">({cand.party})</span>
+                            </div>
+                          </span>
+                          <span className="text-pink-700 font-extrabold">{count} मत ({percent}%)</span>
+                        </div>
+                        <div className="w-full bg-slate-200 h-3.5 rounded-full overflow-hidden">
+                          <div
+                            className="bg-gradient-to-r from-pink-500 to-rose-600 h-full transition-all duration-500"
+                            style={{ width: `${percent}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+          <footer className="text-center text-xs text-slate-500 mt-8 px-4">
+            यो वेबसाइट सार्वजनिक जनमत सर्वेक्षणका लागि हो; यसलाई आधिकारिक निर्वाचन वा प्रमाणित नागरिक मतदानको रूपमा प्रयोग नगर्नुहोस्।
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
